@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.21005.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rUDP_sender", "rUDP_sender\rUDP_sender.vcxproj", "{FEB03179-8D75-4B6F-B280-05DE11AC7E8E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rUDP_receiver", "rUDP_receiver\rUDP_receiver.vcxproj", "{AF8D50F6-3867-4180-8018-DE2560FAE703}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FEB03179-8D75-4B6F-B280-05DE11AC7E8E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FEB03179-8D75-4B6F-B280-05DE11AC7E8E}.Debug|Win32.Build.0 = Debug|Win32
+		{FEB03179-8D75-4B6F-B280-05DE11AC7E8E}.Release|Win32.ActiveCfg = Release|Win32
+		{FEB03179-8D75-4B6F-B280-05DE11AC7E8E}.Release|Win32.Build.0 = Release|Win32
+		{AF8D50F6-3867-4180-8018-DE2560FAE703}.Debug|Win32.ActiveCfg = Debug|Win32
+		{AF8D50F6-3867-4180-8018-DE2560FAE703}.Debug|Win32.Build.0 = Debug|Win32
+		{AF8D50F6-3867-4180-8018-DE2560FAE703}.Release|Win32.ActiveCfg = Release|Win32
+		{AF8D50F6-3867-4180-8018-DE2560FAE703}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
