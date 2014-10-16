@@ -41,7 +41,7 @@ private:
 	struct remoteAddr
 	{
 		sockaddr remote_addr;
-		int size;
+		int size = sizeof(remote_addr);
 	}remote;
 
 	SOCKET sock;

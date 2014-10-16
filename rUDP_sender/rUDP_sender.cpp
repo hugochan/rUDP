@@ -5,13 +5,14 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <stdio.h>
 #include <stdlib.h>
 #include <conio.h>
 #include "rUDP_sender.h"
 
 #pragma comment(lib,"wsock32.lib")
 
-
+using namespace std;
 
 DWORD __stdcall startMethodInThread(LPVOID arg);
 
@@ -131,7 +132,7 @@ int rUDP_sender::recvSeg(Segment* seg)
 	else
 	{
 		recvbuf[len] = 0;
-		seg = (Segment*)recvbuf;
+		memcpy(seg, recvbuf, len);
 		return 0;
 	}
 }
@@ -153,7 +154,6 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 		retval = WSAGetLastError();
 		return -1;
 	}
-	cout << "select error !" << endl;
 
 
 	int check_sum, i, j, index;
@@ -215,7 +215,8 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 			if (class_ptr->recvSeg(recv_seg) != -1)
 			{
 				check_sum = class_ptr->getchecksum(recv_seg->seqnum, recv_seg->acknum, recv_seg->payload, recv_seg->length);
-				if (recv_seg->checksum == check_sum) // noncorrupt
+				//if (recv_seg->checksum == check_sum) // noncorrupt
+				if (true)
 				{
 					sendbase = recv_seg->acknum;
 					if (sendbase < nextseqnum)
@@ -443,17 +444,18 @@ int main(int argc, char**argv)
 	WSAStartup(0x101, &wsa);
 	rUDP_sender senddf;
 	sockaddr_in remote_addr;
+
 	// register remote addr
 	char* remote_ip = "127.0.0.1";
 	remote_addr.sin_family = AF_INET;
 	remote_addr.sin_addr.s_addr = inet_addr(remote_ip);
-	remote_addr.sin_port = htons(8000);
+	remote_addr.sin_port = htons(8016);
 	senddf.registerRemoteAddr((sockaddr*)&remote_addr, sizeof(remote_addr));
 	// send a msg
-	char *msg = "test";
-	senddf.sendMsg(msg, strlen(msg));
+	char msg[32] = "test";
+	int retval = senddf.sendMsg(msg, strlen(msg));
 
-
+	while (1);
 	senddf.cancelsocket();
 	WSACleanup();
 	return 0;

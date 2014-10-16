@@ -49,7 +49,13 @@ int rUDP_receiver::cancelsocket(void)
 
 int rUDP_receiver::bind_socket(sockaddr* addr, int size)
 {
-	bind(sock, addr, size);
+	int retval;
+	retval = bind(sock, addr, size);
+	if (retval == SOCKET_ERROR)
+	{
+		retval = WSAGetLastError();
+		return -1;
+	}
 	return 0;
 }
 
@@ -58,8 +64,9 @@ int rUDP_receiver::recvMsg(char* msg)
 	if (newMsgFlag == true)
 	{
 		newMsgFlag = false;
-		memcpy(msg, deliver_buffer, sizeof(deliver_buffer)); //??
-		delete deliver_buffer;
+		memcpy(msg, deliver_buffer, strlen(deliver_buffer));
+		msg[strlen(deliver_buffer)] = 0;
+		//delete deliver_buffer; // ???
 		return 0;
 	}
 	else
@@ -92,15 +99,21 @@ int rUDP_receiver::recvSeg(Segment* seg)
 {
 	char recvbuf[1024];
 	int len, retval;
-	len = recvfrom(sock, recvbuf, sizeof(recvbuf), 0, &remote.remote_addr, &remote.size);
+	len = recvfrom(sock, recvbuf, sizeof(recvbuf), 0, &(remote.remote_addr), &(remote.size));
 	if (len <= 0)
 	{
-		return -1;
+		retval = WSAGetLastError();
+		if (retval != WSAEWOULDBLOCK && retval != WSAECONNRESET)
+		{
+			cerr << "recv() failed !" << endl;
+			return -1;
+		}
+		return-1;
 	}
 	else
 	{
 		recvbuf[len] = 0;
-		seg = (Segment*)recvbuf;
+		memcpy(seg, recvbuf, len);
 		return 0;
 	}
 }
@@ -120,7 +133,6 @@ DWORD WINAPI rUDP_receiver::receiver_proc(rUDP_receiver* class_ptr)
 		retval = WSAGetLastError();
 		return -1;
 	}
-	cout << "select error !" << endl;
 
 	int check_sum;
 	Segment* recv_seg = new Segment;
@@ -136,13 +148,14 @@ DWORD WINAPI rUDP_receiver::receiver_proc(rUDP_receiver* class_ptr)
 			retval = WSAGetLastError();
 			break;
 		}
-		if (retval = FD_ISSET(sock, &readfds))
+		if (FD_ISSET(sock, &readfds))
 		{
 			// recv event
 			if (class_ptr->recvSeg(recv_seg) != -1)
 			{
 				check_sum = class_ptr->getchecksum(recv_seg->seqnum, recv_seg->acknum, recv_seg->payload, recv_seg->length);
-				if (recv_seg->checksum == check_sum) // noncorrupt
+				//if (recv_seg->checksum == check_sum) // noncorrupt
+				if (true)
 				{
 					//buffer segment & deliver segment & update nextacknum
 					class_ptr->buffer_seg(recv_seg);
@@ -234,6 +247,7 @@ int rUDP_receiver::deliver_seg(void)
 			else offset = len_array[i - 1];
 			memcpy(deliver_buffer + offset, ((Segment*)(recv_buf.recv_array[i].seg))->payload, ((Segment*)(recv_buf.recv_array[i].seg))->length);
 		}
+		deliver_buffer[len] = 0;
 		newMsgFlag = true;
 		delete_inorder(&recv_buf, count); // free recv buffer
 		nextacknum += len; // update nextacknum
@@ -266,6 +280,7 @@ int rUDP_receiver::insert_inorder(RecvBuf* recv_buf, RecvNode recv_node)
 			recv_buf->recv_array[j] = recv_buf->recv_array[j - 1];
 		}
 		recv_buf->recv_array[i] = recv_node;
+		recv_buf->index += 1;
 		return 0;
 	}
 
@@ -312,7 +327,7 @@ int main(int argc, char**argv)
 	sockaddr_in local_addr;
 	local_addr.sin_family = AF_INET;
 	local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	local_addr.sin_port = htons(8000);
+	local_addr.sin_port = htons(8016);
 	recvdf.bind_socket((sockaddr*)&local_addr, sizeof(local_addr));
 	char * msg = new char[2048];
 
@@ -320,7 +335,7 @@ int main(int argc, char**argv)
 	{
 		if (recvdf.recvMsg(msg) == 0)
 		{
-			cout << "new msg" << endl;
+			cout << "sender:" << endl;
 			cout << msg << endl;
 		}
 		else
