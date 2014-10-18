@@ -29,6 +29,8 @@ int main(int argc, char**argv)
 	char* msg;
 	string s;
 	int send_flag = 0;
+	int numofsent = 0;
+	bool first_time = true;
 
 	ifstream fin("../alice.txt");
 	if (!fin)
@@ -39,18 +41,37 @@ int main(int argc, char**argv)
 	}
 	while (getline(fin, s))
 	{
+		numofsent = 0;
+		first_time = true;
 		msg = const_cast<char*>(s.c_str());
 		send_flag = senddf.sendMsg(msg, strlen(msg));
-		while (send_flag == -1)
+		numofsent = send_flag;
+		while (strlen(msg) - numofsent != 0) // not sent all || error
 		{
-			send_flag = senddf.sendMsg(msg, strlen(msg));
-			Sleep(10); // miliseconds
+			if (send_flag != -1) // not sent all
+			{
+				numofsent += send_flag;
+				send_flag = senddf.sendMsg(msg + numofsent, strlen(msg) - numofsent);
+				first_time = false;
+				continue;
+			}
+
+			while (send_flag == -1) // error
+			{
+				if (first_time == true)
+				{
+					send_flag = senddf.sendMsg(msg, strlen(msg));
+					numofsent = 0;
+				}
+				else
+				{
+					send_flag = senddf.sendMsg(msg + numofsent, strlen(msg) - numofsent);
+				}
+				Sleep(10); // miliseconds
+			}
+			first_time = false;
 		}
 	}
-
-	//char msg[32] = "test";
-	//int retval = senddf.sendMsg(msg, strlen(msg));
-	//retval = senddf.sendMsg(msg, 2);
 	
 	while (1);
 	senddf.cancelsocket();
