@@ -88,10 +88,10 @@ can fix the issue in our application program in test_sender.cpp file.
 ----------------------------
 When receive buffer is full, it automatically adopts memory substitution(replace the last element with the new one).
 Also:
-no trunc
-no fast retransmit
-retransmit one each time
-initial seqnum predefined
-the sender leaves the acknum empty in its sent segment
-the receiver leaves seqnum empty in its feedback segment
-no size-limitation and reuse for the sequence number
+no trunc£¬
+no fast retransmit£¬
+retransmit one each time£¬
+initial seqnum predefined£¬
+the sender leaves the acknum empty in its sent segment£¬
+the receiver leaves seqnum empty in its feedback segment£¬
+no size-limitation and reuse for the sequence number...
