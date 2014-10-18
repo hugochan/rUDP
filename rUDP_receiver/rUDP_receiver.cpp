@@ -290,20 +290,28 @@ int rUDP_receiver::buffer_seg(Segment* recv_seg)
 // deliver segment (set status)
 int rUDP_receiver::deliver_seg(void)
 {
-	int len = 0, i, count = -1, offset;
+	int len = 0, i, j, count = -1, offset;
 	int* len_array = new int[recv_buf.index];
-	if (recv_buf.recv_array[0].seqnum == nextacknum)
+	for (j = 0; j < recv_buf.index; j++)
 	{
-		count = 0;
-		len += recv_buf.recv_array[0].payload_len;
-		len_array[0] = recv_buf.recv_array[0].payload_len;
-		for (i = 0; i < recv_buf.index; i++)
+		if (recv_buf.recv_array[j].seqnum == nextacknum)
+		{
+			break;
+		}
+	}
+
+	if (j < recv_buf.index)
+	{
+		count = j;
+		len += recv_buf.recv_array[j].payload_len;
+		len_array[0] = recv_buf.recv_array[j].payload_len;
+		for (i = j; i < recv_buf.index; i++)
 		{
 			if (recv_buf.recv_array[i].seqnum + recv_buf.recv_array[i].payload_len \
 				== recv_buf.recv_array[i + 1].seqnum)
 			{
 				len += recv_buf.recv_array[i+1].payload_len;
-				len_array[i+1] = recv_buf.recv_array[i+1].payload_len;
+				len_array[i-j+1] = recv_buf.recv_array[i+1].payload_len;
 				count += 1;
 			}
 			else
@@ -316,10 +324,10 @@ int rUDP_receiver::deliver_seg(void)
 	if (count >= 0)
 	{
 		//deliver_buffer = new char[len]; // copy data to deliver buffer
-		for (i = 0; i <= count; i++)
+		for (i = j; i <= count; i++)
 		{
-			if (i == 0) offset = 0;
-			else offset = len_array[i - 1];
+			if (i == j) offset = 0;
+			else offset = len_array[i - j - 1];
 			memcpy(deliver_buffer + offset, ((Segment*)(recv_buf.recv_array[i].seg))->payload, ((Segment*)(recv_buf.recv_array[i].seg))->length);
 		}
 		deliver_buffer[len] = 0;

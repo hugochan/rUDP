@@ -76,7 +76,8 @@ private:
 
 	bool NewMsgFlag;
 	int refuseFlag;// -2 - default, nonnegative num(num of sent) - accept, -1 - refuse
-
+	int time_start;
+	bool first_run = true;
 
 	// Function
 	int make_seg(Segment* seg, int nextseqnum, int nextacknum, char* data, int dlen, int checksum);

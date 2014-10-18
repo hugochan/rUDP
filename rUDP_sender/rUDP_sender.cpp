@@ -15,9 +15,9 @@
 #pragma comment(lib,"wsock32.lib")
 using namespace std;
 
-#define TEST 1 // 0 - normal, 1 - test
+#define TEST 0 // 0 - normal, 1 - test
 #define prob 5
-
+#define timeout 500
 
 /////////////////////////
 //----- Type defines ----------------------------------------------------------
@@ -80,6 +80,7 @@ rUDP_sender::rUDP_sender(void)
 	global_msg.len = 0;
 	NewMsgFlag = false;
 	refuseFlag = -2;
+	time_start = 0;
 
 	// register socket
 	// every time instantiate the class, get one socket
@@ -189,7 +190,6 @@ int rUDP_sender::recvSeg(Segment* seg)
 DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 {
 	SOCKET s = class_ptr->sock;
-	bool timeout = false; // test
 	
 	// select
 	int retval, len;
@@ -211,7 +211,6 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 	char resend_buf[1024];
 
 	Info buf_info;
-	int count = 0;
 
 	while (1)
 	{
@@ -240,11 +239,16 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 				
 				// make & send segment
 				class_ptr->make_seg(&seg, nextseqnum, 0, global_msg.content, i, check_sum);// make segment
-				//if (count != 0)
 				class_ptr->sendSeg(seg);// send segment
-				count += 1;
-				if (sendbase == nextseqnum)
+				if (first_run == true)
+				{
 					class_ptr->reset_timer();
+					first_run = false;
+				}
+				if (sendbase == nextseqnum)
+				{
+					class_ptr->reset_timer(); // reset timer
+				}
 				nextseqnum += i;
 				class_ptr->refuse_data(i); // response to upper layer
 			}
@@ -285,8 +289,8 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 				if (recv_seg->checksum == check_sum) // noncorrupt
 				{
 					sendbase = recv_seg->acknum;
-					if (sendbase < nextseqnum)
-						class_ptr->reset_timer();
+					if (sendbase <= nextseqnum)
+						class_ptr->reset_timer(); // reset timer
 
 					// mantain Buffer Information Management (delqueue)
 					index = class_ptr->lookuplqueue(&buf_info_manag, recv_seg->acknum);
@@ -316,9 +320,8 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 		}
 		
 		// timeout event
-		if (timeout == true)
+		if (clock() - time_start >= timeout)
 		{
-			timeout = false;
 			if (class_ptr->checklqueue(&buf_info_manag, &buf_info) == -1)
 			{
 				cout << "buf_info_manag  error!"<< endl;
@@ -344,7 +347,7 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 				class_ptr->make_seg(&seg, sendbase, 0, resend_buf, buf_info.length, check_sum);// make segment
 				class_ptr->sendSeg(seg);// send segment
 
-				class_ptr->reset_timer();
+				class_ptr->reset_timer(); // reset timer
 			}
 			else
 			{
@@ -371,11 +374,10 @@ int rUDP_sender::refuse_data(int flag)
 	return 0;
 }
 
-// to be done !!!
 // reset timer
 int rUDP_sender::reset_timer(void)
 {
-	// to be done
+	time_start = clock();
 	return 0;
 }
 
