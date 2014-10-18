@@ -7,12 +7,60 @@
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
-#include <conio.h>
+#include <time.h>
 #include "rUDP_sender.h"
+#include "../checksum.h"
+
 
 #pragma comment(lib,"wsock32.lib")
-
 using namespace std;
+
+#define TEST 1 // 0 - normal, 1 - test
+#define prob 5
+
+
+/////////////////////////
+//----- Type defines ----------------------------------------------------------
+typedef unsigned char      byte;    // Byte is a char
+typedef unsigned short int word16;  // 16-bit word is a short int
+typedef unsigned int       word32;  // 32-bit word is an int
+
+//----- Defines ---------------------------------------------------------------
+#define BUFFER_LEN        4096      // Length of buffer
+
+//----- Prototypes ------------------------------------------------------------
+word16 checksum(byte *addr, word32 count);
+
+
+//=============================================================================
+//=  Compute Internet Checksum for count bytes beginning at location addr     =
+//=============================================================================
+word16 checksum(byte *addr, word32 count)
+{
+	register word32 sum = 0;
+	// Main summing loop
+	int i = 0;
+	while (count > 1)
+	{
+		sum = sum + *(((word16 *)addr) + i);
+		i++;
+		count = count - 2;
+	}
+
+	// Add left-over byte, if any
+	if (count > 0)
+		sum = sum + *((byte *)addr);
+
+	// Fold 32-bit sum to 16 bits
+	while (sum >> 16)
+		sum = (sum & 0xFFFF) + (sum >> 16);
+
+	return(~sum);
+}
+
+//////////////////////////////////////////
+
+
 
 DWORD __stdcall startMethodInThread(LPVOID arg);
 
@@ -31,7 +79,7 @@ rUDP_sender::rUDP_sender(void)
 	global_msg.content = "";
 	global_msg.len = 0;
 	NewMsgFlag = false;
-	refuseFlag = 0;
+	refuseFlag = -2;
 
 	// register socket
 	// every time instantiate the class, get one socket
@@ -68,6 +116,7 @@ int rUDP_sender::bindsocket(sockaddr* addr, int size)
 }
 
 // send function, blocking & multi-thread not allowed, because of using global flag
+// return num of msg sent
 int rUDP_sender::sendMsg(char* message, int msg_len)
 {
 	int ret;
@@ -75,8 +124,8 @@ int rUDP_sender::sendMsg(char* message, int msg_len)
 	message[msg_len] = 0;
 	global_msg.content = message;
 	global_msg.len = msg_len;
-	while (refuseFlag == 0);
-	if (refuseFlag > 0)
+	while (refuseFlag == -2);
+	if (refuseFlag >= 0)
 	{
 		ret = refuseFlag;
 	}
@@ -89,7 +138,7 @@ int rUDP_sender::sendMsg(char* message, int msg_len)
 	{
 		ret = -1;
 	}
-	refuseFlag = 0; // reset refuseFlag
+	refuseFlag = -2; // reset refuseFlag
 	return ret;
 }
 
@@ -140,13 +189,13 @@ int rUDP_sender::recvSeg(Segment* seg)
 DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 {
 	SOCKET s = class_ptr->sock;
-	bool timeout = false;
+	bool timeout = false; // test
 	
 	// select
 	int retval, len;
 	fd_set readfds;
 	unsigned long mode = 1;// set nonblocking mode
-	const timeval time{ 0, 100000 };
+	const timeval blocking_time{ 0, 100000 };
 	FD_ZERO(&readfds);
 	retval = ioctlsocket(sock, FIONBIO, &mode);
 	if (retval == SOCKET_ERROR)
@@ -162,7 +211,7 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 	char resend_buf[1024];
 
 	Info buf_info;
-
+	int count = 0;
 
 	while (1)
 	{
@@ -180,7 +229,6 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 					if (class_ptr->enqueue(&queue_buf, global_msg.content[i]) == -1)
 						break;
 				}
-				class_ptr->refuse_data(i); // response to upper layer
 
 				// mantain Buffer Information Management (enlqueue)
 				buf_info.seqnum = nextseqnum;
@@ -192,18 +240,21 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 				
 				// make & send segment
 				class_ptr->make_seg(&seg, nextseqnum, 0, global_msg.content, i, check_sum);// make segment
+				//if (count != 0)
 				class_ptr->sendSeg(seg);// send segment
+				count += 1;
 				if (sendbase == nextseqnum)
 					class_ptr->reset_timer();
 				nextseqnum += i;
+				class_ptr->refuse_data(i); // response to upper layer
 			}
 			else
-				refuse_data(0); // response to upper layer
+				class_ptr->refuse_data(-1); // response to upper layer
 		}
 
 		// select
 		FD_SET(sock, &readfds);
-		retval = select(0, &readfds, NULL, NULL, &time);// noblocking
+		retval = select(0, &readfds, NULL, NULL, &blocking_time);// noblocking
 		if (retval == SOCKET_ERROR)
 		{
 			retval = WSAGetLastError();
@@ -215,8 +266,23 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 			if (class_ptr->recvSeg(recv_seg) != -1)
 			{
 				check_sum = class_ptr->getchecksum(recv_seg->seqnum, recv_seg->acknum, recv_seg->payload, recv_seg->length);
-				//if (recv_seg->checksum == check_sum) // noncorrupt
-				if (true)
+				
+				//-----------------------------TEST------------------------------------
+				#if TEST == 1
+				srand((unsigned int)time(NULL));
+				retval = (rand() % 100);
+				if (retval < prob)
+				{
+					// intentionally assume the segment is corrupted with a certain probability
+					while(recv_seg->checksum == check_sum)
+					{
+						check_sum += 1;
+					}
+				}
+				#endif
+				//---------------------------------------------------------------------
+
+				if (recv_seg->checksum == check_sum) // noncorrupt
 				{
 					sendbase = recv_seg->acknum;
 					if (sendbase < nextseqnum)
@@ -252,6 +318,7 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 		// timeout event
 		if (timeout == true)
 		{
+			timeout = false;
 			if (class_ptr->checklqueue(&buf_info_manag, &buf_info) == -1)
 			{
 				cout << "buf_info_manag  error!"<< endl;
@@ -291,14 +358,16 @@ DWORD WINAPI rUDP_sender::sender_proc(rUDP_sender* class_ptr)
 
 int rUDP_sender::refuse_data(int flag)
 {
-	if (flag == 0) // refuse
+	if (flag == -1) // refuse
 		refuseFlag = -1;
-	else if (flag > 0) // num of sent
+	else if (flag >= 0) // num of sent
 	{
 		refuseFlag = flag;
 	}
 	else // treated as refuse
+	{
 		refuseFlag = -1;
+	}
 	return 0;
 }
 
@@ -310,12 +379,20 @@ int rUDP_sender::reset_timer(void)
 	return 0;
 }
 
-// to be done !!!
 // get checksum
 int rUDP_sender::getchecksum(int seqnum, int acknum, char* payload, int length)
 {
-	// to be done
-	return 0;
+	// borrow from the Internet: http://www.csee.usf.edu/~christen/tools/checksum.c
+
+	byte* str = new byte[sizeof(seqnum)+sizeof(acknum)+sizeof(payload)+sizeof(length)];
+	memcpy(str, (byte*)&seqnum, sizeof(seqnum));
+	memcpy(str + sizeof(seqnum), (byte*)&acknum, sizeof(acknum));
+	memcpy(str + sizeof(seqnum)+sizeof(acknum), (byte*)payload, sizeof(payload));
+	memcpy(str + sizeof(seqnum)+sizeof(acknum)+sizeof(payload), (byte*)&length, sizeof(length));
+
+	word16 check = checksum(str, (word32)sizeof(str));
+	delete[] str;
+	return (int)check;
 }
 
 
@@ -435,28 +512,5 @@ DWORD __stdcall startMethodInThread(LPVOID arg)
 	}
 	rUDP_sender* class_ptr = (rUDP_sender*)arg;
 	class_ptr->sender_proc(class_ptr);
-	return 0;
-}
-
-int main(int argc, char**argv)
-{
-	WSAData wsa;
-	WSAStartup(0x101, &wsa);
-	rUDP_sender senddf;
-	sockaddr_in remote_addr;
-
-	// register remote addr
-	char* remote_ip = "127.0.0.1";
-	remote_addr.sin_family = AF_INET;
-	remote_addr.sin_addr.s_addr = inet_addr(remote_ip);
-	remote_addr.sin_port = htons(8016);
-	senddf.registerRemoteAddr((sockaddr*)&remote_addr, sizeof(remote_addr));
-	// send a msg
-	char msg[32] = "test";
-	int retval = senddf.sendMsg(msg, strlen(msg));
-
-	while (1);
-	senddf.cancelsocket();
-	WSACleanup();
 	return 0;
 }

@@ -79,6 +79,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="rUDP_receiver.cpp" />
+    <ClCompile Include="test_receiver.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="rUDP_receiver.h" />

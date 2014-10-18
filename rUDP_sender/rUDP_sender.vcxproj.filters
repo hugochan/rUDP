@@ -23,5 +23,8 @@
     <ClCompile Include="rUDP_sender.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="test_sender.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

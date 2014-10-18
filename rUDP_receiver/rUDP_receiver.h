@@ -47,7 +47,7 @@ private:
 	SOCKET sock;
 	int nextacknum;
 	bool newMsgFlag;
-	char* deliver_buffer;
+	char* deliver_buffer = new char[1024]; // to be improve !!
 
 	// Function
 	int make_seg(Segment* seg, int nextseqnum, int nextacknum, char* data, int dlen, int checksum);

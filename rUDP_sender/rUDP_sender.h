@@ -43,7 +43,7 @@ private:
 	
 	// Sender Buffer
 	// cirular queue
-	#define MAXNUM CWND + 1
+	#define MAXNUM (CWND + 1)
 	typedef struct
 	{
 		char buf[MAXNUM];
@@ -75,7 +75,7 @@ private:
 
 
 	bool NewMsgFlag;
-	int refuseFlag;// 0 - default, positive num(num of sent) - accept, -1 - refuse
+	int refuseFlag;// -2 - default, nonnegative num(num of sent) - accept, -1 - refuse
 
 
 	// Function
